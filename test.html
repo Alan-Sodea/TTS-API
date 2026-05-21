@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test API TTS Gratuite</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 700px;
+            margin: 50px auto;
+            padding: 30px;
+            background: #f7f9fc;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1e3c72;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #555;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+        label {
+            font-weight: 600;
+            color: #2c3e50;
+            display: block;
+            margin: 15px 0 5px;
+        }
+        textarea {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 12px;
+            resize: vertical;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+        .voice-selector {
+            display: flex;
+            gap: 30px;
+            margin: 20px 0;
+        }
+        .voice-selector div {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        input[type="radio"] {
+            accent-color: #1e3c72;
+            width: 18px;
+            height: 18px;
+        }
+        button {
+            background: #1e3c72;
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            font-size: 18px;
+            border-radius: 40px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s, transform 0.1s;
+            box-shadow: 0 4px 10px rgba(30,60,114,0.3);
+            border: none;
+            margin-right: 15px;
+        }
+        button:hover {
+            background: #2a4f8a;
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+        button:disabled {
+            background: #a0aec0;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+        #status {
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        .error {
+            background: #fee;
+            color: #c00;
+            border-left: 5px solid #c00;
+        }
+        .success {
+            background: #efe;
+            color: #060;
+            border-left: 5px solid #060;
+        }
+        .loading {
+            background: #eef;
+            color: #006;
+            border-left: 5px solid #006;
+        }
+        audio {
+            width: 100%;
+            margin: 20px 0 10px;
+            border-radius: 30px;
+        }
+        .note {
+            font-size: 14px;
+            color: #666;
+            margin-top: 30px;
+            border-top: 1px dashed #ccc;
+            padding-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🎙️ Testeur d'API TTS (Voix Réalistes)</h1>
+    <div class="subtitle">API gratuite basée sur Microsoft Edge TTS</div>
+
+    <label for="textInput">📝 Texte à synthétiser :</label>
+    <textarea id="textInput" rows="4" placeholder="Saisissez votre texte ici...">Bonjour, je suis une voix synthétique très réaliste. Ce service est totalement gratuit.</textarea>
+
+    <label>👤 Choisissez la voix :</label>
+    <div class="voice-selector">
+        <div>
+            <input type="radio" id="female" name="gender" value="female" checked>
+            <label for="female" style="display:inline; margin:0;">👩 Femme (Jenny)</label>
+        </div>
+        <div>
+            <input type="radio" id="male" name="gender" value="male">
+            <label for="male" style="display:inline; margin:0;">👨 Homme (Guy)</label>
+        </div>
+    </div>
+
+    <div>
+        <button id="generateBtn">🔊 Générer l'audio</button>
+        <button id="clearBtn" style="background: #6c757d; box-shadow: none;">🗑️ Effacer</button>
+    </div>
+
+    <div id="status"></div>
+
+    <!-- Lecteur audio qui apparaîtra après génération -->
+    <audio id="audioPlayer" controls style="display: none;"></audio>
+
+    <div class="note">
+        ⚡ Assure-toi que ton serveur Node.js tourne sur <code>http://localhost:3000</code>.<br>
+        💡 Le traitement peut prendre 2 à 5 secondes selon la longueur du texte.
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/tts';
+        const textInput = document.getElementById('textInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const statusDiv = document.getElementById('status');
+        const audioPlayer = document.getElementById('audioPlayer');
+
+        // Gérer le bouton "Effacer"
+        clearBtn.addEventListener('click', () => {
+            textInput.value = '';
+            audioPlayer.style.display = 'none';
+            audioPlayer.src = '';
+            statusDiv.innerHTML = '';
+            statusDiv.className = '';
+        });
+
+        // Génération audio
+        generateBtn.addEventListener('click', async () => {
+            const text = textInput.value.trim();
+            if (!text) {
+                showStatus('Veuillez saisir un texte.', 'error');
+                return;
+            }
+
+            // Récupérer le genre sélectionné
+            const gender = document.querySelector('input[name="gender"]:checked').value;
+
+            // Désactiver le bouton pendant la requête
+            generateBtn.disabled = true;
+            generateBtn.textContent = '⏳ Génération en cours...';
+            
+            // Cacher le player précédent
+            audioPlayer.style.display = 'none';
+            showStatus('Envoi de la requête à l\'API...', 'loading');
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text, gender })
+                });
+
+                if (!response.ok) {
+                    // Essayer de lire le message d'erreur JSON
+                    let errorMsg = `Erreur ${response.status}`;
+                    try {
+                        const errData = await response.json();
+                        errorMsg = errData.error || errorMsg;
+                    } catch (e) {
+                        // Réponse non JSON
+                    }
+                    throw new Error(errorMsg);
+                }
+
+                // Récupérer le blob audio (MP3)
+                const audioBlob = await response.blob();
+                
+                // Créer une URL objet pour le lecteur
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                // Mettre à jour le lecteur audio
+                audioPlayer.src = audioUrl;
+                audioPlayer.style.display = 'block';
+                
+                showStatus('✅ Audio généré avec succès !', 'success');
+                
+                // Lancer la lecture automatiquement (optionnel)
+                audioPlayer.play().catch(e => console.log("Lecture auto bloquée par le navigateur"));
+
+            } catch (error) {
+                console.error('Erreur:', error);
+                let errorMessage = error.message;
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    errorMessage = 'Impossible de contacter le serveur. Vérifie que "node server.js" tourne sur le port 3000.';
+                }
+                showStatus(`❌ Erreur : ${errorMessage}`, 'error');
+            } finally {
+                // Réactiver le bouton
+                generateBtn.disabled = false;
+                generateBtn.textContent = '🔊 Générer l\'audio';
+            }
+        });
+
+        function showStatus(message, type) {
+            statusDiv.textContent = message;
+            statusDiv.className = type; // 'error', 'success', 'loading'
+        }
+
+        // Option : appuyer sur Entrée dans le textarea ne déclenche pas la génération (comportement normal)
+        // Mais on pourrait ajouter Ctrl+Enter si voulu.
+    </script>
+</body>
+</html>
