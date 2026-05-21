@@ -21,7 +21,7 @@ Elle gère automatiquement les textes longs en les découpant intelligemment (re
 
 1. **Cloner le dépôt** (ou copier les fichiers) :
    ```bash
-   git clone <url-du-dépôt>
+   git clone https://github.com/Alan-Sodea/TTS-API
    cd tts-api
    ```
 
